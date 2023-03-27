@@ -14,13 +14,32 @@ reported = {}
 
 
 class AlgoRecovery:
-    def __init__(self, words: list, address: str = "", explore: str = ""):
+    def __init__(self, words: list, address: str = "", explore: bool = False, rotate: bool = True):
         self.address = address
-        self.explore = explore
+        self._explore = explore
+        self._rotate = rotate
+
         self.words = [w.lower() for w in words]
-        self.choices = [bip39_choices(w.lower()) for w in words]
-        self.count = count_choices(self.choices)
+        self._original_words = self.words.copy()
+
         self.found: list = []
+
+    @property
+    def choices(self):
+        return [bip39_choices(w.lower()) for w in self.words]
+
+    @property
+    def count(self):
+        return count_choices(self.choices)
+
+    def recover_with_rotate(self):
+        if self._rotate:
+            n_words = len(self.words)
+            for _ in range(n_words):
+                self.words = [self.words[-1]] + self.words[:-1]
+                self.recover()
+                if len(self.found) > 0:
+                    return self.found
 
     def recover(self):
         if len(self.words) == 25:
@@ -86,7 +105,7 @@ class AlgoRecovery:
         sk = mnemonic.to_private_key(phrase)
         address = account.address_from_private_key(sk)
         if address.startswith(prefix):
-            if self.explore and not has_algos(address):
+            if self._explore and not has_algos(address):
                 return
             self.found.append([address, phrase])
             return address, phrase
@@ -182,6 +201,8 @@ def parse_args():
                         help='the account being recovered (prefix), if known')
     parser.add_argument('--explore', action='store_true',
                         help='use algoexplorer API to filter inactive accounts')
+    parser.add_argument('--rotate', action='store_true',
+                        help='try rotations')
     return parser.parse_args()
 
 
