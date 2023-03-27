@@ -99,7 +99,12 @@ class TestAlgoRecovery:
         assert res[0] == EXPECTED_ADDRESS
         assert res[1] == " ".join(WORDS)
 
-    def test_rotate(self):
+    def test_rotate_25(self):
         r = AlgoRecovery([WORDS[-1]] + WORDS[:-1], rotate=True)
         r.recover_with_rotate()
-        assert r.found == [[EXPECTED_ADDRESS, " ".join(WORDS)]]
+        assert [EXPECTED_ADDRESS, " ".join(WORDS)] in r.found
+
+    def test_rotate_24(self):
+        r = AlgoRecovery([WORDS[-2]] + WORDS[:-2], rotate=True)
+        r.recover_with_rotate()
+        assert [EXPECTED_ADDRESS, " ".join(WORDS)] in r.found

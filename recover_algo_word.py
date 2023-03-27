@@ -38,8 +38,6 @@ class AlgoRecovery:
             for _ in range(n_words):
                 self.words = [self.words[-1]] + self.words[:-1]
                 self.recover()
-                if len(self.found) > 0:
-                    return self.found
 
     def recover(self):
         if len(self.words) == 25:
@@ -90,7 +88,7 @@ class AlgoRecovery:
                     self.check_choices(self.choices)
                     self.choices[hi], self.choices[lo] = self.choices[lo], self.choices[hi]
                 if len(self.found) > 0:  # Add a switch to keep going?
-                    sys.exit(0)
+                    return
                 print(f" Trying to replace each word. {25 * 2048} possibilities")
                 for i in range(25):
                     wild = self.choices[:i] + [bip39] + self.choices[i + 1:]
