@@ -1,3 +1,10 @@
+# Fork 
+This is a fork from [jannotti/recover-algo-word](https://github.com/jannotti/recover-algo-word).
+
+Added:
+* Some unit tests 
+* Ability to rotate the input words with `--rotate` arg.
+
 # Purpose
 
 This is a utility to help out when you've misplaced _a little bit_ of
