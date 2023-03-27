@@ -3,12 +3,11 @@ import pytest
 from recover_algo_word import bip39_choices, chk25, candidates, count_choices, index_pairs, AlgoRecovery
 
 EXPECTED_ADDRESS = "IYSW3K34LAQY6OTQ2E65QOPX55HNN6YZVPQIZN7AM7AEQSEXC72E2W3KXI"
+CORRECT_WORDS = ["tent", "pen", "universe", "toddler", "eager", "boil", "deliver", "funny", "naive", "pyramid",
+                 "endless", "safe", "slow", "stereo", "road", "glow", "apple", "asthma", "inflict", "public", "cancel",
+                 "idea", "chat", "absorb", "prize"]
 
-WORDS = ["tent", "pen", "universe", "toddler", "eager", "boil", "deliver", "funny", "naive", "pyramid", "endless",
-         "safe", "slow", "stereo", "road", "glow", "apple", "asthma", "inflict", "public", "cancel", "idea", "chat",
-         "absorb", "prize"]
-
-choices = [[word] for word in WORDS]
+choices = [[word] for word in CORRECT_WORDS]
 
 
 class TestBip39:
@@ -44,7 +43,7 @@ class TestBip39:
 
 
 def test_chk25():
-    result = chk25(WORDS)
+    result = chk25(CORRECT_WORDS)
     assert result is True
 
 
@@ -82,29 +81,29 @@ def test_index_pairs(top, expected):
 
 class TestAlgoRecovery:
     def test_recover_24(self):
-        r = AlgoRecovery(WORDS[:-1])
+        r = AlgoRecovery(CORRECT_WORDS[:-1])
         r.recovery_24()
         res = r.found[0]
         assert res[0] == EXPECTED_ADDRESS
-        assert res[1] == " ".join(WORDS)
+        assert res[1] == " ".join(CORRECT_WORDS)
 
     def test_check_choices(self):
-        r = AlgoRecovery(WORDS)
+        r = AlgoRecovery(CORRECT_WORDS)
         result = r.check_choices(choices)
         assert result == 1
 
     def test_get_candidate(self):
-        r = AlgoRecovery(WORDS)
-        res = r.get_candidate(WORDS)
+        r = AlgoRecovery(CORRECT_WORDS)
+        res = r.get_candidate(CORRECT_WORDS)
         assert res[0] == EXPECTED_ADDRESS
-        assert res[1] == " ".join(WORDS)
+        assert res[1] == " ".join(CORRECT_WORDS)
 
     def test_rotate_25(self):
-        r = AlgoRecovery([WORDS[-1]] + WORDS[:-1], rotate=True)
+        r = AlgoRecovery([CORRECT_WORDS[-1]] + CORRECT_WORDS[:-1], rotate=True)
         r.recover_with_rotate()
-        assert [EXPECTED_ADDRESS, " ".join(WORDS)] in r.found
+        assert [EXPECTED_ADDRESS, " ".join(CORRECT_WORDS)] in r.found
 
     def test_rotate_24(self):
-        r = AlgoRecovery([WORDS[-2]] + WORDS[:-2], rotate=True)
+        r = AlgoRecovery([CORRECT_WORDS[-2]] + CORRECT_WORDS[:-2], rotate=True)
         r.recover_with_rotate()
-        assert [EXPECTED_ADDRESS, " ".join(WORDS)] in r.found
+        assert [EXPECTED_ADDRESS, " ".join(CORRECT_WORDS)] in r.found

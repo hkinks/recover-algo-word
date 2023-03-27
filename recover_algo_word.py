@@ -33,9 +33,11 @@ class AlgoRecovery:
         return count_choices(self.choices)
 
     def recover_with_rotate(self):
+        print(f"Starting rotating recovery for {self.words}")
         if self._rotate:
             n_words = len(self.words)
-            for _ in range(n_words):
+            for _ in range(n_words + 1):
+                print(f"Trying: {' '.join(self.words)}")
                 self.words = [self.words[-1]] + self.words[:-1]
                 self.recover()
 
@@ -117,6 +119,12 @@ class AlgoRecovery:
                 if candidate:
                     print(candidate)
         return found_count
+
+    def start(self):
+        if self._rotate:
+            self.recover_with_rotate()
+        else:
+            self.recover()
 
 
 def bip39_choices(pattern):
@@ -206,4 +214,5 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    r = AlgoRecovery(args.words, args.address, args.explore)
+    r = AlgoRecovery(args.words, args.address, args.explore, args.rotate)
+    r.start()
