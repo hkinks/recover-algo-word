@@ -4,30 +4,107 @@ import difflib
 import math
 import sys
 
-from algosdk.wordlist import word_list_raw
-import algosdk.mnemonic as mnemonic
 import algosdk.account as account
-
-known = """
-sugar police obvious access unit blur
-situate brown home useful manual coffee
-erase pipe deputy panic make radar
-scrap print glide abstract kind absorb
-matrix
-"""
+import algosdk.mnemonic as mnemonic
+from algosdk.wordlist import word_list_raw
 
 bip39 = word_list_raw().split()
-
-
 reported = {}
+
+
+class AlgoRecovery:
+    def __init__(self, words: list, address: str = "", explore: str = ""):
+        self.address = address
+        self.explore = explore
+        self.words = [w.lower() for w in words]
+        self.choices = [bip39_choices(w.lower()) for w in words]
+        self.count = count_choices(self.choices)
+
+    def recover(self):
+        if len(self.words) == 25:
+            self.recovery_25()
+        if len(self.words) == 24:  # Missing one word. Insert _ in each slot
+            self.recovery_24()
+        if len(self.words) == 23:
+            self.recovery_23()
+        if 1 < len(self.words) <= 22:
+            print("No. I can't work miracles. " +
+                  "Finding >= 3 self.words is only possible if _ indicates their positions.")
+        if len(self.words) == 1:
+            # Useful for debugging a pattern
+            print(str(self.choices[0]))
+        elif self.count == 0:
+            print("Unable to find candidates to check.")
+        if len(found) > 1 and not self.address:
+            print("Multiple possibilities. Narrow possibilities with --address")
+
+    def recovery_23(self):
+        # This is at least 600 * 4M = 2.5B possibilities (more if any
+        # words have wildcards).  Utterly hopeless without an
+        # --address to winnow them down, and will take days anyway.
+        if self.count > 0:
+            print(f"Trying {24 * 25 * 2048 * 2048 * self.count} possibilities")
+            for lo, hi in index_pairs(25):
+                wild = self.choices[:lo] + [bip39] + self.choices[lo:hi] + [bip39] + self.choices[hi:]
+                self.check_choices(wild)
+
+    def recovery_24(self):
+        if self.count > 0:
+            print(f"Trying {25 * 2048 * self.count} possibilities")
+            for i in range(25):
+                wild = self.choices[:i] + [bip39] + self.choices[i:]
+                self.check_choices(wild)
+
+    def recovery_25(self):
+        if self.count == 1:  # 25 words given, no wildcarding
+            if self.check_choices(self.choices) == 0:
+                print("Bad checksum. Finding similar mnemonics")
+                print(f" Trying swaps of all pairs. {25 * 24} possibilities")
+                # Maybe this should be a switch that affects all
+                # check_self.choices calls.  That would change all our
+                # reporting about possibility self.count, but it would be
+                # cool to always handle swaps.
+                for lo, hi in index_pairs(25):
+                    self.choices[hi], self.choices[lo] = self.choices[lo], self.choices[hi]
+                    self.check_choices(self.choices)
+                    self.choices[hi], self.choices[lo] = self.choices[lo], self.choices[hi]
+                if len(found) > 0:  # Add a switch to keep going?
+                    sys.exit(0)
+                print(f" Trying to replace each word. {25 * 2048} possibilities")
+                for i in range(25):
+                    wild = self.choices[:i] + [bip39] + self.choices[i + 1:]
+                    self.check_choices(wild)
+        elif self.count > 1:
+            print(f"Trying {self.count} possibilities")
+            self.check_choices(self.choices)
+
+    def print_candidate(self, candidate, prefix):
+        phrase = " ".join([mnemonic.index_to_word[mnemonic.word_to_index[c]]
+                           for c in candidate])
+        sk = mnemonic.to_private_key(phrase)
+        address = account.address_from_private_key(sk)
+        if address.startswith(prefix):
+            if self.explore and not has_algos(address):
+                return
+            print(address, phrase)
+            found.append([address, phrase])
+
+    def check_choices(self, choices):
+        found_count = 0
+        for c in candidates(choices):
+            if chk25(c):
+                found_count += 1
+                self.print_candidate(c, self.address.upper())
+        return found_count
 
 
 def bip39_choices(pattern):
     if pattern in mnemonic.word_to_index:
         return [pattern]
+
     comma = pattern.find(',')
     if comma >= 0:
-        return bip39_choices(pattern[:comma])+bip39_choices(pattern[comma+1:])
+        return bip39_choices(pattern[:comma]) + bip39_choices(pattern[comma + 1:])
 
     underscore = pattern.find('_')
     if underscore >= 0:
@@ -85,38 +162,17 @@ def has_algos(addr):
 found = []
 
 
-def print_candidate(candidate, prefix):
-    phrase = " ".join([mnemonic.index_to_word[mnemonic.word_to_index[c]]
-                       for c in candidate])
-    sk = mnemonic.to_private_key(phrase)
-    address = account.address_from_private_key(sk)
-    if address.startswith(prefix):
-        if args.explore and not has_algos(address):
-            return
-        print(address, phrase)
-        found.append([address, phrase])
-
-
-def check_choices(choices):
-    found = 0
-    for c in candidates(choices):
-        if chk25(c):
-            found += 1
-            print_candidate(c, args.address.upper())
-    return found
-
-
 def count_choices(choices):
     return math.prod([len(c) for c in choices])
 
 
 def index_pairs(top):
-    for lo in range(top-1):
-        for hi in range(lo+1, top):
-            yield (lo, hi)
+    for lo in range(top - 1):
+        for hi in range(lo + 1, top):
+            yield lo, hi
 
 
-if __name__ == "__main__":
+def parse_args():
     parser = argparse.ArgumentParser(
         description='Recover Algorand mnemonics when some is missing or wrong.')
     parser.add_argument('words', metavar='N', nargs='+',
@@ -125,62 +181,9 @@ if __name__ == "__main__":
                         help='the account being recovered (prefix), if known')
     parser.add_argument('--explore', action='store_true',
                         help='use algoexplorer API to filter inactive accounts')
+    return parser.parse_args()
 
-    args = parser.parse_args()
-    words = [w.lower() for w in args.words]
 
-    choices = [bip39_choices(w.lower()) for w in words]
-    count = count_choices(choices)
-
-    if len(words) == 25:
-        if count == 1:          # 25 words given, no wildcarding
-            if check_choices(choices) == 0:
-                print("Bad checksum. Finding similar mnemonics")
-                print(f" Trying swaps of all pairs. {25*24} possibilities")
-                # Maybe this should be a switch that affects all
-                # check_choices calls.  That would change all our
-                # reporting about possibility count, but it would be
-                # cool to always handle swaps.
-                for lo, hi in index_pairs(25):
-                    choices[hi], choices[lo] = choices[lo], choices[hi]
-                    check_choices(choices)
-                    choices[hi], choices[lo] = choices[lo], choices[hi]
-                if len(found) > 0:  # Add a switch to keep going?
-                    sys.exit(0)
-                print(f" Trying to replace each word. {25*2048} possibilities")
-                for i in range(25):
-                    wild = choices[:i] + [bip39] + choices[i+1:]
-                    check_choices(wild)
-        elif count > 1:
-            print(f"Trying {count} possibilities")
-            check_choices(choices)
-
-    if len(words) == 24:        # Missing one word. Insert _ in each slot
-        if count > 0:
-            print(f"Trying {25*2048*count} possibilities")
-            for i in range(25):
-                wild = choices[:i] + [bip39] + choices[i:]
-                check_choices(wild)
-
-    if len(words) == 23:
-        # This is at least 600 * 4M = 2.5B possibilities (more if any
-        # words have wildcards).  Utterly hopeless without an
-        # --address to winnow them down, and will take days anyway.
-        if count > 0:
-            print(f"Trying {24*25*2048*2048*count} possibilities")
-            for lo, hi in index_pairs(25):
-                wild = choices[:lo] + [bip39] + choices[lo:hi] + [bip39] + choices[hi:]
-                check_choices(wild)
-
-    if 1 < len(words) <= 22:
-        print("No. I can't work miracles. " +
-              "Finding >= 3 words is only possible if _ indicates their positions.")
-
-    if len(words) == 1:
-        # Useful for debugging a pattern
-        print(str(choices[0]))
-    elif count == 0:
-        print("Unable to find candidates to check.")
-
-    if len(found) > 1 and not args.address:
-        print("Multiple possibilities. Narrow possibilities with --address")
+if __name__ == "__main__":
+    args = parse_args()
+    r = AlgoRecovery(args.words, args.address, args.explore)
