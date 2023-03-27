@@ -3,6 +3,7 @@ import argparse
 import difflib
 import math
 import sys
+from typing import Tuple, Optional
 
 import algosdk.account as account
 import algosdk.mnemonic as mnemonic
@@ -19,6 +20,7 @@ class AlgoRecovery:
         self.words = [w.lower() for w in words]
         self.choices = [bip39_choices(w.lower()) for w in words]
         self.count = count_choices(self.choices)
+        self.found: list = []
 
     def recover(self):
         if len(self.words) == 25:
@@ -35,7 +37,7 @@ class AlgoRecovery:
             print(str(self.choices[0]))
         elif self.count == 0:
             print("Unable to find candidates to check.")
-        if len(found) > 1 and not self.address:
+        if len(self.found) > 1 and not self.address:
             print("Multiple possibilities. Narrow possibilities with --address")
 
     def recovery_23(self):
@@ -68,7 +70,7 @@ class AlgoRecovery:
                     self.choices[hi], self.choices[lo] = self.choices[lo], self.choices[hi]
                     self.check_choices(self.choices)
                     self.choices[hi], self.choices[lo] = self.choices[lo], self.choices[hi]
-                if len(found) > 0:  # Add a switch to keep going?
+                if len(self.found) > 0:  # Add a switch to keep going?
                     sys.exit(0)
                 print(f" Trying to replace each word. {25 * 2048} possibilities")
                 for i in range(25):
@@ -78,7 +80,7 @@ class AlgoRecovery:
             print(f"Trying {self.count} possibilities")
             self.check_choices(self.choices)
 
-    def print_candidate(self, candidate, prefix):
+    def get_candidate(self, candidate: list, prefix: str = "") -> Optional[Tuple[str, str]]:
         phrase = " ".join([mnemonic.index_to_word[mnemonic.word_to_index[c]]
                            for c in candidate])
         sk = mnemonic.to_private_key(phrase)
@@ -86,15 +88,17 @@ class AlgoRecovery:
         if address.startswith(prefix):
             if self.explore and not has_algos(address):
                 return
-            print(address, phrase)
-            found.append([address, phrase])
+            self.found.append([address, phrase])
+            return address, phrase
 
     def check_choices(self, choices):
         found_count = 0
         for c in candidates(choices):
             if chk25(c):
                 found_count += 1
-                self.print_candidate(c, self.address.upper())
+                candidate = self.get_candidate(c, self.address.upper())
+                if candidate:
+                    print(candidate)
         return found_count
 
 
@@ -157,9 +161,6 @@ def candidates(options):
 def has_algos(addr):
     import explore
     explore.active(addr)
-
-
-found = []
 
 
 def count_choices(choices):

@@ -87,3 +87,9 @@ class TestAlgoRecovery:
         r = AlgoRecovery(WORDS)
         result = r.check_choices(choices)
         assert result == 1
+
+    def test_get_candidate(self):
+        r = AlgoRecovery(WORDS)
+        res = r.get_candidate(WORDS)
+        assert res[0] == "IYSW3K34LAQY6OTQ2E65QOPX55HNN6YZVPQIZN7AM7AEQSEXC72E2W3KXI"
+        assert res[1] == " ".join(WORDS)
